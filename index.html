@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f1a">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>محادثة جيميني</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#0b0f1a; --panel:#131a2b; --panel2:#1a2338; --line:#243049;
+  --text:#e9edf8; --muted:#8c97b6;
+  --idle:#51607f; --listen:#2dd4bf; --speak:#a78bfa; --wait:#fbbf24; --err:#f87171;
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{
+  background:radial-gradient(120% 70% at 50% 0%,#17203a 0%,var(--bg) 60%) fixed;
+  color:var(--text);
+  font:16px/1.55 "Segoe UI",Tahoma,system-ui,-apple-system,"Noto Sans Arabic",sans-serif;
+  display:flex;flex-direction:column;height:100dvh;overflow:hidden;
+}
+header{
+  display:flex;align-items:center;gap:10px;
+  padding:calc(10px + var(--safe-t)) 16px 6px;
+}
+header h1{font-size:17px;margin:0;font-weight:600;flex:1}
+.chip{font-size:12px;color:var(--muted);background:var(--panel);border:1px solid var(--line);
+  padding:3px 10px;border-radius:99px;direction:ltr;white-space:nowrap}
+.icon-btn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--panel);
+  color:var(--text);display:grid;place-items:center;cursor:pointer}
+.icon-btn:active{background:var(--panel2)}
+.icon-btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.icon-btn[aria-pressed="true"]{background:#3b1d24;border-color:#7a2f3b;color:#fecaca}
+
+.stage{display:grid;place-items:center;padding:14px 0 4px;gap:10px}
+.orb{
+  --lv:0;--c:var(--idle);
+  width:min(50vw,210px);aspect-ratio:1;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--c) 70%,#fff),var(--c) 55%,color-mix(in srgb,var(--c) 45%,#000));
+  box-shadow:0 0 calc(24px + var(--lv)*90px) calc(2px + var(--lv)*28px) color-mix(in srgb,var(--c) 50%,transparent);
+  transform:scale(calc(1 + var(--lv)*.2));
+  transition:background .4s,box-shadow .09s,transform .09s;
+}
+.orb[data-s=listening]{--c:var(--listen)}
+.orb[data-s=speaking]{--c:var(--speak)}
+.orb[data-s=connecting]{--c:var(--wait);animation:breathe 1.2s ease-in-out infinite}
+.orb[data-s=error]{--c:var(--err)}
+.orb[data-s=idle]{animation:breathe 4s ease-in-out infinite}
+@keyframes breathe{50%{transform:scale(1.05)}}
+@media (prefers-reduced-motion:reduce){.orb{animation:none!important}}
+#status{font-size:17px;min-height:1.6em;text-align:center;padding:0 20px}
+#timer{font-size:13px;color:var(--muted);direction:ltr;min-height:1.2em}
+
+#log{flex:1;overflow-y:auto;padding:8px 14px 14px;display:flex;flex-direction:column;gap:8px;scroll-behavior:smooth}
+.msg{max-width:86%;padding:9px 13px;border-radius:16px;white-space:pre-wrap;word-break:break-word;font-size:15.5px}
+.msg.user{align-self:flex-start;background:var(--panel2);border:1px solid var(--line);border-end-start-radius:4px}
+.msg.model{align-self:flex-end;background:#2a2150;border:1px solid #3d3377;border-end-end-radius:4px}
+.msg.note{align-self:center;background:transparent;color:var(--muted);font-size:13px;padding:2px 8px;text-align:center}
+.empty{margin:auto;color:var(--muted);text-align:center;padding:0 28px;font-size:14.5px}
+
+footer{padding:8px 14px calc(12px + var(--safe-b));border-top:1px solid var(--line);background:rgba(11,15,26,.85);backdrop-filter:blur(8px)}
+#textRow{display:none;gap:8px;margin-bottom:10px}
+#textRow.open{display:flex}
+#textRow input{flex:1;min-width:0;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit}
+#textRow button{padding:0 16px;border-radius:12px;border:0;background:var(--speak);color:#160f33;font:inherit;font-weight:700;cursor:pointer}
+.bar{display:flex;align-items:center;gap:12px}
+#call{
+  flex:1;height:56px;border-radius:28px;border:0;cursor:pointer;
+  font:inherit;font-size:17px;font-weight:700;color:#04201c;background:var(--listen);
+  display:flex;align-items:center;justify-content:center;gap:10px;
+}
+#call svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#call.live{background:var(--err);color:#2b0707}
+#call:disabled{opacity:.6}
+.bar .icon-btn{width:56px;height:56px;border-radius:50%}
+
+dialog{
+  width:min(560px,calc(100vw - 24px));max-height:calc(100dvh - 24px);
+  border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--text);padding:0;
+}
+dialog::backdrop{background:rgba(3,6,14,.72)}
+dialog form{display:flex;flex-direction:column;gap:14px;padding:18px;max-height:calc(100dvh - 24px);overflow:auto}
+dialog h2{margin:0;font-size:18px}
+label{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}
+label small{color:var(--muted);opacity:.85;font-size:12.5px}
+input[type=password],input[type=text],select,textarea{
+  width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit;font-size:15px}
+input[type=password],input[type=text]{direction:ltr;text-align:left}
+textarea{min-height:130px;resize:vertical}
+.check{flex-direction:row;align-items:center;gap:10px;color:var(--text)}
+.check input{width:20px;height:20px;accent-color:var(--listen)}
+.row{display:flex;gap:10px}
+.btn{flex:1;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font:inherit;font-weight:600;cursor:pointer}
+.btn.primary{background:var(--listen);border-color:var(--listen);color:#04201c}
+.btn.danger{color:#fecaca;border-color:#7a2f3b}
+.hint{font-size:12.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>محادثة جيميني</h1>
+  <span class="chip" id="modelChip">gemini-3.8-live</span>
+  <button class="icon-btn" id="settingsBtn" aria-label="الإعدادات">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+  </button>
+</header>
+
+<section class="stage">
+  <div class="orb" id="orb" data-s="idle"></div>
+  <div id="status" aria-live="polite">اضغط «ابدأ المحادثة»</div>
+  <div id="timer"></div>
+</section>
+
+<main id="log" aria-live="polite"><div class="empty" id="empty">تكلّم بالدارجة أو بأي لغة، وسيجيبك بالصوت.<br>يُفضَّل استعمال سماعات لتجنّب الصدى.</div></main>
+
+<footer>
+  <form id="textRow" autocomplete="off">
+    <input id="textIn" type="text" placeholder="اكتب رسالة…" enterkeyhint="send" dir="auto">
+    <button type="submit">إرسال</button>
+  </form>
+  <div class="bar">
+    <button class="icon-btn" id="kbBtn" type="button" aria-label="كتابة رسالة">
+      <svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>
+    </button>
+    <button id="call" type="button">
+      <svg viewBox="0 0 24 24" id="callIcon"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>
+      <span id="callLabel">ابدأ المحادثة</span>
+    </button>
+    <button class="icon-btn" id="muteBtn" type="button" aria-pressed="false" aria-label="كتم الميكروفون" disabled>
+      <svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/><path id="muteSlash" d="M3 3l18 18" style="display:none"/></svg>
+    </button>
+  </div>
+</footer>
+
+<dialog id="dlg">
+  <form method="dialog" id="settingsForm">
+    <h2>الإعدادات</h2>
+    <label>مفتاح Gemini API
+      <input id="fKey" type="password" autocomplete="off" spellcheck="false" placeholder="الصق المفتاح هنا">
+      <small>يُحفظ في هذا الهاتف فقط ولا يُرسَل إلا إلى Google.</small>
+    </label>
+    <label>النموذج
+      <select id="fModel"></select>
+    </label>
+    <label>الصوت
+      <select id="fVoice"></select>
+    </label>
+    <label>تعليمات النموذج
+      <textarea id="fSystem"></textarea>
+    </label>
+    <label class="check"><input type="checkbox" id="fMuteSpeak"> اكتم الميكروفون أثناء كلام النموذج (يمنع الصدى على مكبّر الصوت)</label>
+    <div class="row">
+      <button class="btn primary" value="save" id="saveBtn">حفظ</button>
+      <button class="btn" value="cancel" formnovalidate>إغلاق</button>
+    </div>
+    <div class="row">
+      <button class="btn" type="button" id="resetSys">استعادة التعليمات الافتراضية</button>
+      <button class="btn danger" type="button" id="clearKey">حذف المفتاح</button>
+    </div>
+    <p class="hint">التغييرات تسري عند بدء محادثة جديدة.</p>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>
